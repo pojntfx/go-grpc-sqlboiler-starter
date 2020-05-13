@@ -14,8 +14,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-//go:generate sqlboiler --wipe psql -o pkg/sql/generated
-
 func main() {
 	laddr := flag.String("laddr", ":3069", "Listen address")
 	dbhost := flag.String("dbhost", "localhost", "Database host")
