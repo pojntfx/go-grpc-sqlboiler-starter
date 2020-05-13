@@ -84,3 +84,32 @@ func (t *Todos) Get(ctx context.Context, req *proto.TodoID) (*proto.Todo, error)
 		Body:  todo.Body,
 	}, nil
 }
+
+// Delete deletes one todo
+func (t *Todos) Delete(ctx context.Context, req *proto.TodoID) (*proto.Todo, error) {
+	todo, err := models.FindTodo(context.Background(), t.DB, int(req.GetID()))
+	if err == sql.ErrNoRows {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.NotFound, "could not find todo")
+	}
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not get todo")
+	}
+
+	if _, err := todo.Delete(context.Background(), t.DB); err != nil {
+		if err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not delete todo")
+		}
+	}
+
+	return &proto.Todo{
+		ID:    int64(todo.ID),
+		Title: todo.Title,
+		Body:  todo.Body,
+	}, nil
+}
