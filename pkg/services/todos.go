@@ -63,3 +63,24 @@ func (t *Todos) List(ctx context.Context, req *empty.Empty) (*proto.TodoList, er
 		Todos: outTodos,
 	}, nil
 }
+
+// Get gets one todo
+func (t *Todos) Get(ctx context.Context, req *proto.TodoID) (*proto.Todo, error) {
+	todo, err := models.FindTodo(context.Background(), t.DB, int(req.GetID()))
+	if err == sql.ErrNoRows {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.NotFound, "could not find todo")
+	}
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not get todo")
+	}
+
+	return &proto.Todo{
+		ID:    int64(todo.ID),
+		Title: todo.Title,
+		Body:  todo.Body,
+	}, nil
+}

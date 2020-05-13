@@ -11,6 +11,8 @@ service Todos {
   rpc Create(NewTodo) returns (Todo);
   // List lists all todos
   rpc List(google.protobuf.Empty) returns (TodoList);
+  // Get gets one todo
+  rpc Get(TodoID) returns (Todo);
 }
 
 // NewTodo is a new todo
@@ -28,3 +30,6 @@ message Todo {
 
 // TodoList is a list of todos
 message TodoList { repeated Todo Todos = 1; }
+
+// TodoID is a todo's ID
+message TodoID { int64 ID = 1; }

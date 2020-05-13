@@ -169,10 +169,51 @@ func (m *TodoList) GetTodos() []*Todo {
 	return nil
 }
 
+// TodoID is a todo's ID
+type TodoID struct {
+	ID                   int64    `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *TodoID) Reset()         { *m = TodoID{} }
+func (m *TodoID) String() string { return proto.CompactTextString(m) }
+func (*TodoID) ProtoMessage()    {}
+func (*TodoID) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a7703e18c08e8710, []int{3}
+}
+
+func (m *TodoID) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_TodoID.Unmarshal(m, b)
+}
+func (m *TodoID) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_TodoID.Marshal(b, m, deterministic)
+}
+func (m *TodoID) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TodoID.Merge(m, src)
+}
+func (m *TodoID) XXX_Size() int {
+	return xxx_messageInfo_TodoID.Size(m)
+}
+func (m *TodoID) XXX_DiscardUnknown() {
+	xxx_messageInfo_TodoID.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TodoID proto.InternalMessageInfo
+
+func (m *TodoID) GetID() int64 {
+	if m != nil {
+		return m.ID
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*NewTodo)(nil), "todos.NewTodo")
 	proto.RegisterType((*Todo)(nil), "todos.Todo")
 	proto.RegisterType((*TodoList)(nil), "todos.TodoList")
+	proto.RegisterType((*TodoID)(nil), "todos.TodoID")
 }
 
 func init() {
@@ -180,7 +221,7 @@ func init() {
 }
 
 var fileDescriptor_a7703e18c08e8710 = []byte{
-	// 221 bytes of a gzipped FileDescriptorProto
+	// 245 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2e, 0xc9, 0x4f, 0xc9,
 	0x2f, 0xd6, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x05, 0x73, 0xa4, 0xa4, 0xd3, 0xf3, 0xf3,
 	0xd3, 0x73, 0x52, 0xf5, 0xc1, 0x82, 0x49, 0xa5, 0x69, 0xfa, 0xa9, 0xb9, 0x05, 0x25, 0x95, 0x10,
@@ -190,11 +231,13 @@ var fileDescriptor_a7703e18c08e8710 = []byte{
 	0xeb, 0xe0, 0xe3, 0x62, 0xf2, 0x74, 0x01, 0x2b, 0x67, 0x0e, 0x62, 0xf2, 0x74, 0x41, 0x98, 0xc0,
 	0x84, 0xcd, 0x04, 0x66, 0x24, 0x13, 0x74, 0xb9, 0x38, 0x40, 0x26, 0xf8, 0x64, 0x16, 0x97, 0x08,
 	0x29, 0x72, 0xb1, 0x82, 0xd8, 0xc5, 0x12, 0x8c, 0x0a, 0xcc, 0x1a, 0xdc, 0x46, 0xdc, 0x7a, 0x10,
-	0x3f, 0x80, 0xc4, 0x82, 0x20, 0x32, 0x46, 0xf1, 0x50, 0x25, 0x42, 0xaa, 0x5c, 0x6c, 0xce, 0x45,
-	0xa9, 0x89, 0x25, 0xa9, 0x42, 0x7c, 0x50, 0x65, 0x50, 0xd7, 0x4b, 0x21, 0x6b, 0x13, 0xd2, 0xe7,
-	0x62, 0x01, 0x1b, 0x2d, 0xa6, 0x07, 0xf1, 0xbb, 0x1e, 0xcc, 0xef, 0x7a, 0xae, 0x20, 0xbf, 0x4b,
-	0xf1, 0x23, 0x29, 0x06, 0x29, 0x74, 0x62, 0x8f, 0x62, 0x85, 0x28, 0x61, 0x03, 0x53, 0xc6, 0x80,
-	0x00, 0x00, 0x00, 0xff, 0xff, 0x55, 0x6c, 0x0a, 0x8d, 0x49, 0x01, 0x00, 0x00,
+	0x3f, 0x80, 0xc4, 0x82, 0x20, 0x32, 0x4a, 0x12, 0x5c, 0x6c, 0x20, 0x86, 0xa7, 0x0b, 0xba, 0x95,
+	0x46, 0x4d, 0x8c, 0x50, 0xdd, 0x42, 0xaa, 0x5c, 0x6c, 0xce, 0x45, 0xa9, 0x89, 0x25, 0xa9, 0x42,
+	0x7c, 0x50, 0x13, 0xa0, 0x1e, 0x93, 0x42, 0x36, 0x51, 0x48, 0x9f, 0x8b, 0x05, 0x6c, 0xab, 0x98,
+	0x1e, 0x24, 0x58, 0xf4, 0x60, 0xc1, 0xa2, 0xe7, 0x0a, 0x0a, 0x16, 0x29, 0x7e, 0x24, 0xc5, 0x50,
+	0xe7, 0x31, 0xbb, 0xa7, 0x96, 0x08, 0xf1, 0x22, 0x89, 0x7b, 0xba, 0xa0, 0x98, 0xe9, 0xc4, 0x1e,
+	0xc5, 0x0a, 0x31, 0x85, 0x0d, 0x4c, 0x19, 0x03, 0x02, 0x00, 0x00, 0xff, 0xff, 0x44, 0x6b, 0xb8,
+	0x69, 0x87, 0x01, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -211,7 +254,10 @@ const _ = grpc.SupportPackageIsVersion6
 type TodosClient interface {
 	// Create creates a todo
 	Create(ctx context.Context, in *NewTodo, opts ...grpc.CallOption) (*Todo, error)
+	// List lists all todos
 	List(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*TodoList, error)
+	// Get gets one todo
+	Get(ctx context.Context, in *TodoID, opts ...grpc.CallOption) (*Todo, error)
 }
 
 type todosClient struct {
@@ -240,11 +286,23 @@ func (c *todosClient) List(ctx context.Context, in *empty.Empty, opts ...grpc.Ca
 	return out, nil
 }
 
+func (c *todosClient) Get(ctx context.Context, in *TodoID, opts ...grpc.CallOption) (*Todo, error) {
+	out := new(Todo)
+	err := c.cc.Invoke(ctx, "/todos.Todos/Get", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TodosServer is the server API for Todos service.
 type TodosServer interface {
 	// Create creates a todo
 	Create(context.Context, *NewTodo) (*Todo, error)
+	// List lists all todos
 	List(context.Context, *empty.Empty) (*TodoList, error)
+	// Get gets one todo
+	Get(context.Context, *TodoID) (*Todo, error)
 }
 
 // UnimplementedTodosServer can be embedded to have forward compatible implementations.
@@ -256,6 +314,9 @@ func (*UnimplementedTodosServer) Create(ctx context.Context, req *NewTodo) (*Tod
 }
 func (*UnimplementedTodosServer) List(ctx context.Context, req *empty.Empty) (*TodoList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+}
+func (*UnimplementedTodosServer) Get(ctx context.Context, req *TodoID) (*Todo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
 
 func RegisterTodosServer(s *grpc.Server, srv TodosServer) {
@@ -298,6 +359,24 @@ func _Todos_List_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Todos_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TodoID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TodosServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/todos.Todos/Get",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TodosServer).Get(ctx, req.(*TodoID))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Todos_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "todos.Todos",
 	HandlerType: (*TodosServer)(nil),
@@ -309,6 +388,10 @@ var _Todos_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "List",
 			Handler:    _Todos_List_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _Todos_Get_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
