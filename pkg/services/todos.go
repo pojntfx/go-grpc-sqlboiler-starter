@@ -85,6 +85,43 @@ func (t *Todos) Get(ctx context.Context, req *proto.TodoID) (*proto.Todo, error)
 	}, nil
 }
 
+// Update updates one todo
+func (t *Todos) Update(ctx context.Context, req *proto.Todo) (*proto.Todo, error) {
+	todo, err := models.FindTodo(context.Background(), t.DB, int(req.GetID()))
+	if err == sql.ErrNoRows {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.NotFound, "could not find todo")
+	}
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not get todo")
+	}
+
+	if req.GetTitle() != "" {
+		todo.Title = req.GetTitle()
+	}
+
+	if req.GetBody() != "" {
+		todo.Body = req.GetBody()
+	}
+
+	if _, err := todo.Update(context.Background(), t.DB, boil.Infer()); err != nil {
+		if err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not update todo")
+		}
+	}
+
+	return &proto.Todo{
+		ID:    int64(todo.ID),
+		Title: todo.Title,
+		Body:  todo.Body,
+	}, nil
+}
+
 // Delete deletes one todo
 func (t *Todos) Delete(ctx context.Context, req *proto.TodoID) (*proto.Todo, error) {
 	todo, err := models.FindTodo(context.Background(), t.DB, int(req.GetID()))

@@ -13,6 +13,8 @@ service Todos {
   rpc List(google.protobuf.Empty) returns (TodoList);
   // Get gets one todo
   rpc Get(TodoID) returns (Todo);
+  // Update updates one todo
+  rpc Update(Todo) returns (Todo);
   // Delete deletes one todo
   rpc Delete(TodoID) returns (Todo);
 }
