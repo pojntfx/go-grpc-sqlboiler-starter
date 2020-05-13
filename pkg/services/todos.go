@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"log"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	proto "github.com/pojntfx/go-grpc-sqlboiler-starter/pkg/proto/generated"
 	models "github.com/pojntfx/go-grpc-sqlboiler-starter/pkg/sql/generated"
 	"github.com/volatiletech/sqlboiler/boil"
@@ -37,5 +38,28 @@ func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, er
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
+	}, nil
+}
+
+// List lists all todos
+func (t *Todos) List(ctx context.Context, req *empty.Empty) (*proto.TodoList, error) {
+	todos, err := models.Todos().All(context.Background(), t.DB)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not get todos")
+	}
+
+	outTodos := []*proto.Todo{}
+	for _, todo := range todos {
+		outTodos = append(outTodos, &proto.Todo{
+			ID:    int64(todo.ID),
+			Title: todo.Title,
+			Body:  todo.Body,
+		})
+	}
+
+	return &proto.TodoList{
+		Todos: outTodos,
 	}, nil
 }
