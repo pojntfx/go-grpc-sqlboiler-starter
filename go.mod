@@ -1,4 +1,4 @@
-module github.com/pojntfx/go-todo-backend
+module github.com/pojntfx/miza-backend
 
 go 1.14
 
