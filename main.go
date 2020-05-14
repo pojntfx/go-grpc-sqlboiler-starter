@@ -8,8 +8,8 @@ import (
 	"net"
 
 	_ "github.com/lib/pq"
-	proto "github.com/pojntfx/go-grpc-sqlboiler-starter/pkg/proto/generated"
-	"github.com/pojntfx/go-grpc-sqlboiler-starter/pkg/services"
+	proto "github.com/pojntfx/go-todo-backend/pkg/proto/generated"
+	"github.com/pojntfx/go-todo-backend/pkg/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -18,9 +18,9 @@ func main() {
 	laddr := flag.String("laddr", ":3069", "Listen address")
 	dbhost := flag.String("dbhost", "localhost", "Database host")
 	dbport := flag.String("dbport", "5432", "Database port")
-	dbusr := flag.String("dbusr", "go-grpc-sqlboiler-starter", "Database user")
-	dbpass := flag.String("dbpass", "go-grpc-sqlboiler-starter", "Database password")
-	dbname := flag.String("dbname", "go-grpc-sqlboiler-starter", "Database name")
+	dbusr := flag.String("dbusr", "go-todo-backend", "Database user")
+	dbpass := flag.String("dbpass", "go-todo-backend", "Database password")
+	dbname := flag.String("dbname", "go-todo-backend", "Database name")
 
 	db, err := sql.Open("postgres", fmt.Sprintf("host=%v port=%v sslmode=disable user=%v password=%v dbname=%v", *dbhost, *dbport, *dbusr, *dbpass, *dbname))
 	if err != nil {

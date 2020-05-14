@@ -1,4 +1,4 @@
-module github.com/pojntfx/go-grpc-sqlboiler-starter
+module github.com/pojntfx/go-todo-backend
 
 go 1.14
 
