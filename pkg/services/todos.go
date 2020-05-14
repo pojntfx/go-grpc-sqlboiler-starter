@@ -9,8 +9,8 @@ import (
 	"log"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	proto "github.com/pojntfx/go-todo-backend/pkg/proto/generated"
-	models "github.com/pojntfx/go-todo-backend/pkg/sql/generated"
+	proto "github.com/pojntfx/miza-backend/pkg/proto/generated"
+	models "github.com/pojntfx/miza-backend/pkg/sql/generated"
 	"github.com/volatiletech/sqlboiler/boil"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
