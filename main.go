@@ -21,6 +21,7 @@ func main() {
 	dbusr := flag.String("dbusr", "miza-backend", "Database user")
 	dbpass := flag.String("dbpass", "miza-backend", "Database password")
 	dbname := flag.String("dbname", "miza-backend", "Database name")
+	flag.Parse()
 
 	db, err := sql.Open("postgres", fmt.Sprintf("host=%v port=%v sslmode=disable user=%v password=%v dbname=%v", *dbhost, *dbport, *dbusr, *dbpass, *dbname))
 	if err != nil {
