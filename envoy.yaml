@@ -1,0 +1,80 @@
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+static_resources:
+  listeners:
+    - name: miza
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 10000 }
+      filter_chains:
+        - filters:
+            - name: envoy.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                codec_type: AUTO
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/miza-todos"
+                          route:
+                            regex_rewrite:
+                              pattern:
+                                google_re2: {}
+                                regex: ^/miza-todos(/.*)$
+                              substitution: \1
+                            cluster: miza-todos
+                http_filters:
+                  - name: envoy.filters.http.jwt_authn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.filter.http.jwt_authn.v2alpha.JwtAuthentication
+                      rules:
+                        - match:
+                            prefix: /
+                            headers:
+                              - name: ":method"
+                                exact_match: "POST"
+                          requires:
+                            provider_name: google-accounts
+                      providers:
+                        google-accounts:
+                          issuer: accounts.google.com
+                          forward: true
+                          remote_jwks:
+                            http_uri:
+                              uri: https://www.googleapis.com/oauth2/v3/certs
+                              cluster: google-jwks
+                              timeout: 0.25s
+                            cache_duration:
+                              seconds: 1
+                  - name: envoy.filters.http.router
+  clusters:
+    - name: miza-todos
+      connect_timeout: 0.25s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: miza-todos
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8080
+    - name: google-jwks
+      connect_timeout: 0.25s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      lb_policy: ROUND_ROBIN
+      hosts:
+        - socket_address:
+            address: googleapis.com
+            port_value: 443
+      tls_context: { sni: www.googleapis.com }
