@@ -45,7 +45,7 @@ static_resources:
                       providers:
                         google-accounts:
                           issuer: accounts.google.com
-                          forward: true
+                          payload_in_metadata: jwt_payload
                           remote_jwks:
                             http_uri:
                               uri: https://www.googleapis.com/oauth2/v3/certs
@@ -53,6 +53,16 @@ static_resources:
                               timeout: 0.25s
                             cache_duration:
                               seconds: 1
+                  - name: envoy.lua
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+                      inline_code: |
+                        function envoy_on_request(request_handle)
+                          local meta = request_handle:streamInfo():dynamicMetadata()
+                          for _, value in pairs(meta) do
+                            request_handle:headers():add("x-miza-user", value.jwt_payload.email)
+                          end
+                        end
                   - name: envoy.filters.http.router
   clusters:
     - name: miza-todos
