@@ -6,12 +6,14 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	proto "github.com/pojntfx/miza-backend/pkg/proto/generated"
 	models "github.com/pojntfx/miza-backend/pkg/sql/generated"
 	"github.com/volatiletech/sqlboiler/boil"
+	"github.com/volatiletech/sqlboiler/queries/qm"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -23,11 +25,32 @@ type Todos struct {
 	DB *sql.DB
 }
 
+// getNamespaceFromContext returns the namespace from the context
+func (t *Todos) getNamespaceFromContext(ctx context.Context) (string, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", errors.New("could not parse metadata")
+	}
+
+	namespace := md.Get("x-miza-namespace")
+	if len(namespace) == 0 || namespace[0] == "" {
+		return "", errors.New("no namespace specified")
+	}
+
+	return namespace[0], nil
+}
+
 // Create creates a todo
 func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, error) {
+	ns, err := t.getNamespaceFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, err.Error())
+	}
+
 	todo := &models.Todo{
-		Title: req.GetTitle(),
-		Body:  req.GetBody(),
+		Title:     req.GetTitle(),
+		Body:      req.GetBody(),
+		Namespace: ns,
 	}
 
 	if err := todo.Insert(context.Background(), t.DB, boil.Infer()); err != nil {
@@ -45,14 +68,12 @@ func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, er
 
 // List lists all todos
 func (t *Todos) List(ctx context.Context, req *empty.Empty) (*proto.TodoList, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Errorf(codes.Unknown, "could not get metadata")
+	ns, err := t.getNamespaceFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
-	log.Printf("Got username: %s", md.Get("x-miza-user"))
-
-	todos, err := models.Todos().All(context.Background(), t.DB)
+	todos, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns)).All(context.Background(), t.DB)
 	if err != nil {
 		log.Println(err.Error())
 
@@ -75,7 +96,12 @@ func (t *Todos) List(ctx context.Context, req *empty.Empty) (*proto.TodoList, er
 
 // Get gets one todo
 func (t *Todos) Get(ctx context.Context, req *proto.TodoID) (*proto.Todo, error) {
-	todo, err := models.FindTodo(context.Background(), t.DB, int(req.GetID()))
+	ns, err := t.getNamespaceFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, err.Error())
+	}
+
+	todo, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns), qm.Where(models.TodoColumns.ID+"= ?", req.GetID())).One(context.Background(), t.DB)
 	if err == sql.ErrNoRows {
 		log.Println(err.Error())
 
@@ -96,7 +122,12 @@ func (t *Todos) Get(ctx context.Context, req *proto.TodoID) (*proto.Todo, error)
 
 // Update updates one todo
 func (t *Todos) Update(ctx context.Context, req *proto.Todo) (*proto.Todo, error) {
-	todo, err := models.FindTodo(context.Background(), t.DB, int(req.GetID()))
+	ns, err := t.getNamespaceFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, err.Error())
+	}
+
+	todo, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns), qm.Where(models.TodoColumns.ID+"= ?", req.GetID())).One(context.Background(), t.DB)
 	if err == sql.ErrNoRows {
 		log.Println(err.Error())
 
@@ -133,7 +164,12 @@ func (t *Todos) Update(ctx context.Context, req *proto.Todo) (*proto.Todo, error
 
 // Delete deletes one todo
 func (t *Todos) Delete(ctx context.Context, req *proto.TodoID) (*proto.Todo, error) {
-	todo, err := models.FindTodo(context.Background(), t.DB, int(req.GetID()))
+	ns, err := t.getNamespaceFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, err.Error())
+	}
+
+	todo, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns), qm.Where(models.TodoColumns.ID+"= ?", req.GetID())).One(context.Background(), t.DB)
 	if err == sql.ErrNoRows {
 		log.Println(err.Error())
 
