@@ -23,22 +23,25 @@ import (
 
 // Todo is an object representing the database table.
 type Todo struct {
-	ID    int    `boil:"id" json:"id" toml:"id" yaml:"id"`
-	Title string `boil:"title" json:"title" toml:"title" yaml:"title"`
-	Body  string `boil:"body" json:"body" toml:"body" yaml:"body"`
+	ID        int    `boil:"id" json:"id" toml:"id" yaml:"id"`
+	Title     string `boil:"title" json:"title" toml:"title" yaml:"title"`
+	Body      string `boil:"body" json:"body" toml:"body" yaml:"body"`
+	Namespace string `boil:"namespace" json:"namespace" toml:"namespace" yaml:"namespace"`
 
 	R *todoR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L todoL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var TodoColumns = struct {
-	ID    string
-	Title string
-	Body  string
+	ID        string
+	Title     string
+	Body      string
+	Namespace string
 }{
-	ID:    "id",
-	Title: "title",
-	Body:  "body",
+	ID:        "id",
+	Title:     "title",
+	Body:      "body",
+	Namespace: "namespace",
 }
 
 // Generated where
@@ -76,13 +79,15 @@ func (w whereHelperstring) IN(slice []string) qm.QueryMod {
 }
 
 var TodoWhere = struct {
-	ID    whereHelperint
-	Title whereHelperstring
-	Body  whereHelperstring
+	ID        whereHelperint
+	Title     whereHelperstring
+	Body      whereHelperstring
+	Namespace whereHelperstring
 }{
-	ID:    whereHelperint{field: "\"todos\".\"id\""},
-	Title: whereHelperstring{field: "\"todos\".\"title\""},
-	Body:  whereHelperstring{field: "\"todos\".\"body\""},
+	ID:        whereHelperint{field: "\"todos\".\"id\""},
+	Title:     whereHelperstring{field: "\"todos\".\"title\""},
+	Body:      whereHelperstring{field: "\"todos\".\"body\""},
+	Namespace: whereHelperstring{field: "\"todos\".\"namespace\""},
 }
 
 // TodoRels is where relationship names are stored.
@@ -102,8 +107,8 @@ func (*todoR) NewStruct() *todoR {
 type todoL struct{}
 
 var (
-	todoAllColumns            = []string{"id", "title", "body"}
-	todoColumnsWithoutDefault = []string{"title", "body"}
+	todoAllColumns            = []string{"id", "title", "body", "namespace"}
+	todoColumnsWithoutDefault = []string{"title", "body", "namespace"}
 	todoColumnsWithDefault    = []string{"id"}
 	todoPrimaryKeyColumns     = []string{"id"}
 )
