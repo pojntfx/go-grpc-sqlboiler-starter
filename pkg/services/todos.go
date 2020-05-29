@@ -13,6 +13,7 @@ import (
 	models "github.com/pojntfx/miza-backend/pkg/sql/generated"
 	"github.com/volatiletech/sqlboiler/boil"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -44,6 +45,13 @@ func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, er
 
 // List lists all todos
 func (t *Todos) List(ctx context.Context, req *empty.Empty) (*proto.TodoList, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Errorf(codes.Unknown, "could not get metadata")
+	}
+
+	log.Printf("Got username: %s", md.Get("x-miza-user"))
+
 	todos, err := models.Todos().All(context.Background(), t.DB)
 	if err != nil {
 		log.Println(err.Error())
