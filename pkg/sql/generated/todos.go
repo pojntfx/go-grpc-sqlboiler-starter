@@ -26,6 +26,7 @@ type Todo struct {
 	ID        int    `boil:"id" json:"id" toml:"id" yaml:"id"`
 	Title     string `boil:"title" json:"title" toml:"title" yaml:"title"`
 	Body      string `boil:"body" json:"body" toml:"body" yaml:"body"`
+	Index     int64  `boil:"index" json:"index" toml:"index" yaml:"index"`
 	Namespace string `boil:"namespace" json:"namespace" toml:"namespace" yaml:"namespace"`
 
 	R *todoR `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -36,11 +37,13 @@ var TodoColumns = struct {
 	ID        string
 	Title     string
 	Body      string
+	Index     string
 	Namespace string
 }{
 	ID:        "id",
 	Title:     "title",
 	Body:      "body",
+	Index:     "index",
 	Namespace: "namespace",
 }
 
@@ -78,15 +81,33 @@ func (w whereHelperstring) IN(slice []string) qm.QueryMod {
 	return qm.WhereIn(fmt.Sprintf("%s IN ?", w.field), values...)
 }
 
+type whereHelperint64 struct{ field string }
+
+func (w whereHelperint64) EQ(x int64) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.EQ, x) }
+func (w whereHelperint64) NEQ(x int64) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.NEQ, x) }
+func (w whereHelperint64) LT(x int64) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.LT, x) }
+func (w whereHelperint64) LTE(x int64) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.LTE, x) }
+func (w whereHelperint64) GT(x int64) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.GT, x) }
+func (w whereHelperint64) GTE(x int64) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.GTE, x) }
+func (w whereHelperint64) IN(slice []int64) qm.QueryMod {
+	values := make([]interface{}, 0, len(slice))
+	for _, value := range slice {
+		values = append(values, value)
+	}
+	return qm.WhereIn(fmt.Sprintf("%s IN ?", w.field), values...)
+}
+
 var TodoWhere = struct {
 	ID        whereHelperint
 	Title     whereHelperstring
 	Body      whereHelperstring
+	Index     whereHelperint64
 	Namespace whereHelperstring
 }{
 	ID:        whereHelperint{field: "\"todos\".\"id\""},
 	Title:     whereHelperstring{field: "\"todos\".\"title\""},
 	Body:      whereHelperstring{field: "\"todos\".\"body\""},
+	Index:     whereHelperint64{field: "\"todos\".\"index\""},
 	Namespace: whereHelperstring{field: "\"todos\".\"namespace\""},
 }
 
@@ -107,8 +128,8 @@ func (*todoR) NewStruct() *todoR {
 type todoL struct{}
 
 var (
-	todoAllColumns            = []string{"id", "title", "body", "namespace"}
-	todoColumnsWithoutDefault = []string{"title", "body", "namespace"}
+	todoAllColumns            = []string{"id", "title", "body", "index", "namespace"}
+	todoColumnsWithoutDefault = []string{"title", "body", "index", "namespace"}
 	todoColumnsWithDefault    = []string{"id"}
 	todoPrimaryKeyColumns     = []string{"id"}
 )
