@@ -47,10 +47,18 @@ func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, er
 		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
+	todoCount, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns)).Count(context.Background(), t.DB)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not get todos")
+	}
+
 	todo := &models.Todo{
 		Title:     req.GetTitle(),
 		Body:      req.GetBody(),
 		Namespace: ns,
+		Index:     todoCount + 1,
 	}
 
 	if err := todo.Insert(context.Background(), t.DB, boil.Infer()); err != nil {
@@ -63,6 +71,7 @@ func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, er
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
+		Index: todo.Index,
 	}, nil
 }
 
@@ -73,7 +82,10 @@ func (t *Todos) List(ctx context.Context, req *empty.Empty) (*proto.TodoList, er
 		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
-	todos, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns)).All(context.Background(), t.DB)
+	todos, err := models.Todos(
+		qm.Where(models.TodoColumns.Namespace+"= ?", ns),
+		qm.OrderBy(models.TodoColumns.Index),
+	).All(context.Background(), t.DB)
 	if err != nil {
 		log.Println(err.Error())
 
@@ -86,6 +98,7 @@ func (t *Todos) List(ctx context.Context, req *empty.Empty) (*proto.TodoList, er
 			ID:    int64(todo.ID),
 			Title: todo.Title,
 			Body:  todo.Body,
+			Index: todo.Index,
 		})
 	}
 
@@ -117,6 +130,7 @@ func (t *Todos) Get(ctx context.Context, req *proto.TodoID) (*proto.Todo, error)
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
+		Index: todo.Index,
 	}, nil
 }
 
@@ -159,6 +173,7 @@ func (t *Todos) Update(ctx context.Context, req *proto.Todo) (*proto.Todo, error
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
+		Index: todo.Index,
 	}, nil
 }
 
@@ -193,5 +208,106 @@ func (t *Todos) Delete(ctx context.Context, req *proto.TodoID) (*proto.Todo, err
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
+		Index: todo.Index,
+	}, nil
+}
+
+// Reorder reorders a todo
+func (t *Todos) Reorder(ctx context.Context, req *proto.TodoReorder) (*proto.Todo, error) {
+	ns, err := t.getNamespaceFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, err.Error())
+	}
+
+	tx, err := t.DB.BeginTx(ctx, nil)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not begin transaction")
+	}
+
+	todo, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns), qm.Where(models.TodoColumns.ID+"= ?", req.GetID())).One(context.Background(), t.DB)
+	if err == sql.ErrNoRows {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.NotFound, "could not find todo")
+	}
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not get todo")
+	}
+
+	oldIndex := todo.Index
+	todo.Index += req.GetOffset()
+
+	// Recalculate the other indexes
+	{
+		var todosToUpdate models.TodoSlice
+		if todo.Index > oldIndex {
+			// The new index is higher than the old one; recount the indexes in between
+			// the new index and the old index
+			todosToUpdate, err = models.Todos(
+				qm.Where(models.TodoColumns.Namespace+"= ?", ns),
+				qm.Where(models.TodoColumns.Index+">= ?", oldIndex),
+				qm.Where(models.TodoColumns.Index+"<= ?", todo.Index),
+			).All(context.Background(), t.DB)
+			if err != nil {
+				log.Println(err.Error())
+
+				return nil, status.Errorf(codes.Unknown, "could not get todos")
+			}
+		} else {
+			// The new index is lower than the old one; recount the indexes in between
+			// the new index and the old index
+			todosToUpdate, err = models.Todos(
+				qm.Where(models.TodoColumns.Namespace+"= ?", ns),
+				qm.Where(models.TodoColumns.Index+">= ?", todo.Index),
+				qm.Where(models.TodoColumns.Index+"<= ?", oldIndex),
+			).All(context.Background(), t.DB)
+			if err != nil {
+				log.Println(err.Error())
+
+				return nil, status.Errorf(codes.Unknown, "could not get todos")
+			}
+		}
+
+		for _, todoToUpdate := range todosToUpdate {
+			if todo.Index > oldIndex {
+				todoToUpdate.Index = todoToUpdate.Index - 1
+			} else {
+				todoToUpdate.Index = todoToUpdate.Index + 1
+			}
+
+			if _, err := todoToUpdate.Update(context.Background(), t.DB, boil.Infer()); err != nil {
+				if err != nil {
+					log.Println(err.Error())
+
+					return nil, status.Errorf(codes.Unknown, "could not update todo")
+				}
+			}
+		}
+	}
+
+	// Update the new index
+	if _, err := todo.Update(context.Background(), t.DB, boil.Infer()); err != nil {
+		if err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not update todo")
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not commit transaction")
+	}
+
+	return &proto.Todo{
+		ID:    int64(todo.ID),
+		Title: todo.Title,
+		Body:  todo.Body,
+		Index: todo.Index,
 	}, nil
 }
