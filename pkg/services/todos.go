@@ -184,6 +184,13 @@ func (t *Todos) Delete(ctx context.Context, req *proto.TodoID) (*proto.Todo, err
 		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
+	tx, err := t.DB.BeginTx(ctx, nil)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not begin transaction")
+	}
+
 	todo, err := models.Todos(qm.Where(models.TodoColumns.Namespace+"= ?", ns), qm.Where(models.TodoColumns.ID+"= ?", req.GetID())).One(context.Background(), t.DB)
 	if err == sql.ErrNoRows {
 		log.Println(err.Error())
@@ -196,12 +203,43 @@ func (t *Todos) Delete(ctx context.Context, req *proto.TodoID) (*proto.Todo, err
 		return nil, status.Errorf(codes.Unknown, "could not get todo")
 	}
 
+	// Recalculate indexes for todos which have a higher index
+	{
+		todosToUpdate, err := models.Todos(
+			qm.Where(models.TodoColumns.Namespace+"= ?", ns),
+			qm.Where(models.TodoColumns.Index+">= ?", todo.Index),
+		).All(context.Background(), t.DB)
+		if err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not get todos")
+		}
+
+		for _, todoToUpdate := range todosToUpdate {
+			todoToUpdate.Index = todoToUpdate.Index - 1
+
+			if _, err := todoToUpdate.Update(context.Background(), t.DB, boil.Infer()); err != nil {
+				if err != nil {
+					log.Println(err.Error())
+
+					return nil, status.Errorf(codes.Unknown, "could not update todo")
+				}
+			}
+		}
+	}
+
 	if _, err := todo.Delete(context.Background(), t.DB); err != nil {
 		if err != nil {
 			log.Println(err.Error())
 
 			return nil, status.Errorf(codes.Unknown, "could not delete todo")
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not commit transaction")
 	}
 
 	return &proto.Todo{
