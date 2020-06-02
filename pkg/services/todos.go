@@ -7,10 +7,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
-	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/nats-io/nats.go"
 	proto "github.com/pojntfx/miza-backend/pkg/proto/generated"
 	models "github.com/pojntfx/miza-backend/pkg/sql/generated"
 	"github.com/volatiletech/sqlboiler/boil"
@@ -18,12 +19,15 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	protobuf "github.com/golang/protobuf/proto"
 )
 
 // Todos manages todos
 type Todos struct {
 	proto.UnimplementedTodosServer
-	DB *sql.DB
+	DB   *sql.DB
+	NATS *nats.Conn
 }
 
 // getNamespaceFromContext returns the namespace from the context
@@ -68,12 +72,27 @@ func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, er
 		return nil, status.Errorf(codes.Unknown, "could not create todo")
 	}
 
-	return &proto.Todo{
+	protoTodo := &proto.Todo{
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
 		Index: todo.Index,
-	}, nil
+	}
+
+	natsTodo, err := protobuf.Marshal(protoTodo)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not marshal created todo")
+	}
+
+	if err := t.NATS.Publish(fmt.Sprintf("todos:create:%s", ns), natsTodo); err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not published created todo")
+	}
+
+	return protoTodo, nil
 }
 
 // List lists all todos
@@ -358,13 +377,24 @@ func (t *Todos) SubscribeToChanges(req *empty.Empty, srv proto.Todos_SubscribeTo
 		return status.Errorf(codes.Unknown, err.Error())
 	}
 
-	for {
-		if err := srv.Send(&proto.TodoChange{Type: proto.TodoChangeType_CREATE, Todo: &proto.Todo{Title: ns}}); err != nil {
-			log.Println(err.Error())
+	createTodosChan := make(chan *nats.Msg, 64)
 
-			return status.Errorf(codes.Unknown, "could not send todo change")
+	if _, err = t.NATS.ChanSubscribe(fmt.Sprintf("todos:create:%s", ns), createTodosChan); err != nil {
+		log.Println(err)
+
+		return status.Errorf(codes.Unknown, "could not subscribe to created todo changes")
+	}
+
+	for msg := range createTodosChan {
+		var todo proto.Todo
+		if err := protobuf.Unmarshal(msg.Data, &todo); err != nil {
+			log.Println("could not unmarshal created todo change", err.Error())
 		}
 
-		time.Sleep(time.Second * 1)
+		if err := srv.Send(&proto.TodoChange{Type: proto.TodoChangeType_CREATE, Todo: &todo}); err != nil {
+			log.Println("could not send created todo change", err.Error())
+		}
 	}
+
+	return status.Errorf(codes.Unknown, "could not send todo changes")
 }
