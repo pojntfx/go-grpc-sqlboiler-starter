@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	proto "github.com/pojntfx/miza-backend/pkg/proto/generated"
@@ -348,4 +349,22 @@ func (t *Todos) Reorder(ctx context.Context, req *proto.TodoReorder) (*proto.Tod
 		Body:  todo.Body,
 		Index: todo.Index,
 	}, nil
+}
+
+// SubscribeToChanges subscribes to all changes
+func (t *Todos) SubscribeToChanges(req *empty.Empty, srv proto.Todos_SubscribeToChangesServer) error {
+	ns, err := t.getNamespaceFromContext(srv.Context())
+	if err != nil {
+		return status.Errorf(codes.Unknown, err.Error())
+	}
+
+	for {
+		if err := srv.Send(&proto.TodoChange{Type: proto.TodoChangeType_CREATE, Todo: &proto.Todo{Title: ns}}); err != nil {
+			log.Println(err.Error())
+
+			return status.Errorf(codes.Unknown, "could not send todo change")
+		}
+
+		time.Sleep(time.Second * 1)
+	}
 }
