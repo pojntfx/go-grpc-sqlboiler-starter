@@ -24,6 +24,8 @@ static_resources:
                         - match:
                             prefix: "/miza-todos"
                           route:
+                            timeout:
+                              seconds: 10000000 # Pseudo-infinite; HTTP long-polling
                             regex_rewrite:
                               pattern:
                                 google_re2: {}
@@ -50,7 +52,7 @@ static_resources:
                             http_uri:
                               uri: https://www.googleapis.com/oauth2/v3/certs
                               cluster: google-jwks
-                              timeout: 0.25s
+                              timeout: 1s
                             cache_duration:
                               seconds: 1
                   - name: envoy.lua
