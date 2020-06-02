@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/nats-io/nats.go"
@@ -21,6 +22,12 @@ import (
 	"google.golang.org/grpc/status"
 
 	protobuf "github.com/golang/protobuf/proto"
+)
+
+const (
+	TodosCreatedChannelPrefix = "todos:created" // NATS prefix for created todos
+	TodosUpdatedChannelPrefix = "todos:updated" // NATS prefix for updated todos
+	TodosDeletedChannelPrefix = "todos:deleted" // NATS prefix for deleted todos
 )
 
 // Todos manages todos
@@ -86,7 +93,7 @@ func (t *Todos) Create(ctx context.Context, req *proto.NewTodo) (*proto.Todo, er
 		return nil, status.Errorf(codes.Unknown, "could not marshal created todo")
 	}
 
-	if err := t.NATS.Publish(fmt.Sprintf("todos:create:%s", ns), natsTodo); err != nil {
+	if err := t.NATS.Publish(fmt.Sprintf("%s:%s", TodosCreatedChannelPrefix, ns), natsTodo); err != nil {
 		log.Println(err.Error())
 
 		return nil, status.Errorf(codes.Unknown, "could not published created todo")
@@ -189,12 +196,27 @@ func (t *Todos) Update(ctx context.Context, req *proto.Todo) (*proto.Todo, error
 		}
 	}
 
-	return &proto.Todo{
+	protoTodo := &proto.Todo{
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
 		Index: todo.Index,
-	}, nil
+	}
+
+	natsTodo, err := protobuf.Marshal(protoTodo)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not marshal updated todo")
+	}
+
+	if err := t.NATS.Publish(fmt.Sprintf("%s:%s", TodosUpdatedChannelPrefix, ns), natsTodo); err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not published updated todo")
+	}
+
+	return protoTodo, nil
 }
 
 // Delete deletes one todo
@@ -262,12 +284,27 @@ func (t *Todos) Delete(ctx context.Context, req *proto.TodoID) (*proto.Todo, err
 		return nil, status.Errorf(codes.Unknown, "could not commit transaction")
 	}
 
-	return &proto.Todo{
+	protoTodo := &proto.Todo{
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
 		Index: todo.Index,
-	}, nil
+	}
+
+	natsTodo, err := protobuf.Marshal(protoTodo)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not marshal deleted todo")
+	}
+
+	if err := t.NATS.Publish(fmt.Sprintf("%s:%s", TodosDeletedChannelPrefix, ns), natsTodo); err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not published deleted todo")
+	}
+
+	return protoTodo, nil
 }
 
 // Reorder reorders a todo
@@ -362,12 +399,27 @@ func (t *Todos) Reorder(ctx context.Context, req *proto.TodoReorder) (*proto.Tod
 		return nil, status.Errorf(codes.Unknown, "could not commit transaction")
 	}
 
-	return &proto.Todo{
+	protoTodo := &proto.Todo{
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
 		Index: todo.Index,
-	}, nil
+	}
+
+	natsTodo, err := protobuf.Marshal(protoTodo)
+	if err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not marshal updated todo")
+	}
+
+	if err := t.NATS.Publish(fmt.Sprintf("%s:%s", TodosUpdatedChannelPrefix, ns), natsTodo); err != nil {
+		log.Println(err.Error())
+
+		return nil, status.Errorf(codes.Unknown, "could not published updated todo")
+	}
+
+	return protoTodo, nil
 }
 
 // SubscribeToChanges subscribes to all changes
@@ -377,24 +429,76 @@ func (t *Todos) SubscribeToChanges(req *empty.Empty, srv proto.Todos_SubscribeTo
 		return status.Errorf(codes.Unknown, err.Error())
 	}
 
-	createTodosChan := make(chan *nats.Msg, 64)
+	createTodosChan, updateTodosChan, deleteTodosChan := make(chan *nats.Msg, 64), make(chan *nats.Msg, 64), make(chan *nats.Msg, 64)
 
-	if _, err = t.NATS.ChanSubscribe(fmt.Sprintf("todos:create:%s", ns), createTodosChan); err != nil {
+	if _, err = t.NATS.ChanSubscribe(fmt.Sprintf("%s:%s", TodosCreatedChannelPrefix, ns), createTodosChan); err != nil {
 		log.Println(err)
 
 		return status.Errorf(codes.Unknown, "could not subscribe to created todo changes")
 	}
 
-	for msg := range createTodosChan {
-		var todo proto.Todo
-		if err := protobuf.Unmarshal(msg.Data, &todo); err != nil {
-			log.Println("could not unmarshal created todo change", err.Error())
+	if _, err = t.NATS.ChanSubscribe(fmt.Sprintf("%s:%s", TodosUpdatedChannelPrefix, ns), updateTodosChan); err != nil {
+		log.Println(err)
+
+		return status.Errorf(codes.Unknown, "could not subscribe to updated todo changes")
+	}
+
+	if _, err = t.NATS.ChanSubscribe(fmt.Sprintf("%s:%s", TodosDeletedChannelPrefix, ns), deleteTodosChan); err != nil {
+		log.Println(err)
+
+		return status.Errorf(codes.Unknown, "could not subscribe to deleted todo changes")
+	}
+
+	var wg sync.WaitGroup
+
+	wg.Add(3)
+
+	go func(wg *sync.WaitGroup) {
+		for msg := range createTodosChan {
+			var todo proto.Todo
+			if err := protobuf.Unmarshal(msg.Data, &todo); err != nil {
+				log.Println("could not unmarshal created todo change", err.Error())
+			}
+
+			if err := srv.Send(&proto.TodoChange{Type: proto.TodoChangeType_CREATE, Todo: &todo}); err != nil {
+				log.Println("could not send created todo change", err.Error())
+			}
 		}
 
-		if err := srv.Send(&proto.TodoChange{Type: proto.TodoChangeType_CREATE, Todo: &todo}); err != nil {
-			log.Println("could not send created todo change", err.Error())
+		wg.Done()
+	}(&wg)
+
+	go func(wg *sync.WaitGroup) {
+		for msg := range updateTodosChan {
+			var todo proto.Todo
+			if err := protobuf.Unmarshal(msg.Data, &todo); err != nil {
+				log.Println("could not unmarshal updated todo change", err.Error())
+			}
+
+			if err := srv.Send(&proto.TodoChange{Type: proto.TodoChangeType_UPDATE, Todo: &todo}); err != nil {
+				log.Println("could not send updated todo change", err.Error())
+			}
 		}
-	}
+
+		wg.Done()
+	}(&wg)
+
+	go func(wg *sync.WaitGroup) {
+		for msg := range deleteTodosChan {
+			var todo proto.Todo
+			if err := protobuf.Unmarshal(msg.Data, &todo); err != nil {
+				log.Println("could not unmarshal deleted todo change", err.Error())
+			}
+
+			if err := srv.Send(&proto.TodoChange{Type: proto.TodoChangeType_DELETE, Todo: &todo}); err != nil {
+				log.Println("could not send deleted todo change", err.Error())
+			}
+		}
+
+		wg.Done()
+	}(&wg)
+
+	wg.Wait()
 
 	return status.Errorf(codes.Unknown, "could not send todo changes")
 }
