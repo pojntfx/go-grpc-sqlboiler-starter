@@ -337,49 +337,47 @@ func (t *Todos) Reorder(ctx context.Context, req *proto.TodoReorder) (*proto.Tod
 	todo.Index += req.GetOffset()
 
 	// Recalculate the other indexes
-	{
-		var todosToUpdate models.TodoSlice
+	var todosToUpdate models.TodoSlice
+	if todo.Index > oldIndex {
+		// The new index is higher than the old one; recount the indexes in between
+		// the new index and the old index
+		todosToUpdate, err = models.Todos(
+			qm.Where(models.TodoColumns.Namespace+"= ?", ns),
+			qm.Where(models.TodoColumns.Index+">= ?", oldIndex),
+			qm.Where(models.TodoColumns.Index+"<= ?", todo.Index),
+		).All(context.Background(), t.DB)
+		if err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not get todos")
+		}
+	} else {
+		// The new index is lower than the old one; recount the indexes in between
+		// the new index and the old index
+		todosToUpdate, err = models.Todos(
+			qm.Where(models.TodoColumns.Namespace+"= ?", ns),
+			qm.Where(models.TodoColumns.Index+">= ?", todo.Index),
+			qm.Where(models.TodoColumns.Index+"<= ?", oldIndex),
+		).All(context.Background(), t.DB)
+		if err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not get todos")
+		}
+	}
+
+	for _, todoToUpdate := range todosToUpdate {
 		if todo.Index > oldIndex {
-			// The new index is higher than the old one; recount the indexes in between
-			// the new index and the old index
-			todosToUpdate, err = models.Todos(
-				qm.Where(models.TodoColumns.Namespace+"= ?", ns),
-				qm.Where(models.TodoColumns.Index+">= ?", oldIndex),
-				qm.Where(models.TodoColumns.Index+"<= ?", todo.Index),
-			).All(context.Background(), t.DB)
-			if err != nil {
-				log.Println(err.Error())
-
-				return nil, status.Errorf(codes.Unknown, "could not get todos")
-			}
+			todoToUpdate.Index = todoToUpdate.Index - 1
 		} else {
-			// The new index is lower than the old one; recount the indexes in between
-			// the new index and the old index
-			todosToUpdate, err = models.Todos(
-				qm.Where(models.TodoColumns.Namespace+"= ?", ns),
-				qm.Where(models.TodoColumns.Index+">= ?", todo.Index),
-				qm.Where(models.TodoColumns.Index+"<= ?", oldIndex),
-			).All(context.Background(), t.DB)
-			if err != nil {
-				log.Println(err.Error())
-
-				return nil, status.Errorf(codes.Unknown, "could not get todos")
-			}
+			todoToUpdate.Index = todoToUpdate.Index + 1
 		}
 
-		for _, todoToUpdate := range todosToUpdate {
-			if todo.Index > oldIndex {
-				todoToUpdate.Index = todoToUpdate.Index - 1
-			} else {
-				todoToUpdate.Index = todoToUpdate.Index + 1
-			}
+		if _, err := todoToUpdate.Update(context.Background(), t.DB, boil.Infer()); err != nil {
+			if err != nil {
+				log.Println(err.Error())
 
-			if _, err := todoToUpdate.Update(context.Background(), t.DB, boil.Infer()); err != nil {
-				if err != nil {
-					log.Println(err.Error())
-
-					return nil, status.Errorf(codes.Unknown, "could not update todo")
-				}
+				return nil, status.Errorf(codes.Unknown, "could not update todo")
 			}
 		}
 	}
@@ -399,27 +397,34 @@ func (t *Todos) Reorder(ctx context.Context, req *proto.TodoReorder) (*proto.Tod
 		return nil, status.Errorf(codes.Unknown, "could not commit transaction")
 	}
 
-	protoTodo := &proto.Todo{
+	for _, todoToUpdate := range append(todosToUpdate, todo) {
+		protoTodo := &proto.Todo{
+			ID:    int64(todoToUpdate.ID),
+			Title: todoToUpdate.Title,
+			Body:  todoToUpdate.Body,
+			Index: todoToUpdate.Index,
+		}
+
+		natsTodo, err := protobuf.Marshal(protoTodo)
+		if err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not marshal updated todo")
+		}
+
+		if err := t.NATS.Publish(fmt.Sprintf("%s:%s", TodosUpdatedChannelPrefix, ns), natsTodo); err != nil {
+			log.Println(err.Error())
+
+			return nil, status.Errorf(codes.Unknown, "could not published updated todo")
+		}
+	}
+
+	return &proto.Todo{
 		ID:    int64(todo.ID),
 		Title: todo.Title,
 		Body:  todo.Body,
 		Index: todo.Index,
-	}
-
-	natsTodo, err := protobuf.Marshal(protoTodo)
-	if err != nil {
-		log.Println(err.Error())
-
-		return nil, status.Errorf(codes.Unknown, "could not marshal updated todo")
-	}
-
-	if err := t.NATS.Publish(fmt.Sprintf("%s:%s", TodosUpdatedChannelPrefix, ns), natsTodo); err != nil {
-		log.Println(err.Error())
-
-		return nil, status.Errorf(codes.Unknown, "could not published updated todo")
-	}
-
-	return protoTodo, nil
+	}, nil
 }
 
 // SubscribeToChanges subscribes to all changes
